@@ -47,6 +47,38 @@ export interface Database {
           created_at?: string
         }
       }
+      public_members: {
+        Row: {
+          id: string
+          nama: string
+          nim: string | null
+          prodi: string | null
+          fakultas: string | null
+          jabatan: string | null
+          foto: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          nama: string
+          nim?: string | null
+          prodi?: string | null
+          fakultas?: string | null
+          jabatan?: string | null
+          foto?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          nama?: string
+          nim?: string | null
+          prodi?: string | null
+          fakultas?: string | null
+          jabatan?: string | null
+          foto?: string | null
+          created_at?: string
+        }
+      }
       work_programs: {
         Row: {
           id: string

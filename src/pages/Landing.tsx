@@ -1,7 +1,10 @@
 import { Link } from 'react-router-dom'
-import { BookOpen, Users, CalendarCheck, MapPin, ChevronRight, ArrowRight } from 'lucide-react'
+import { BookOpen, Users, CalendarCheck, MapPin, ChevronRight, ArrowRight, User as UserIcon } from 'lucide-react'
+import { useMembers } from '../services/api'
 
 export default function Landing() {
+  const { data: members } = useMembers()
+
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
       {/* Header / Navbar */}
@@ -25,7 +28,7 @@ export default function Landing() {
                 to="/login"
                 className="text-sm font-medium text-unair-blue hover:text-blue-900 transition-colors"
               >
-                Masuk
+                Masuk Dashboard
               </Link>
               <Link 
                 to="/login"
@@ -58,7 +61,7 @@ export default function Landing() {
           </p>
           <div className="flex flex-col sm:flex-row justify-center gap-4">
             <Link 
-              to="/login"
+              to="/dashboard"
               className="bg-unair-gold hover:bg-amber-500 text-slate-900 px-8 py-4 rounded-full text-lg font-bold transition-all hover:scale-105 shadow-xl shadow-amber-500/30 flex items-center justify-center gap-2"
             >
               Akses Dashboard
@@ -122,55 +125,26 @@ export default function Landing() {
           </div>
           
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8">
-            {/* Kades / Ketua */}
-            <div className="group text-center">
-              <div className="w-32 h-32 sm:w-40 sm:h-40 mx-auto rounded-full bg-slate-100 mb-4 overflow-hidden shadow-lg group-hover:shadow-unair-blue/20 transition-all group-hover:-translate-y-2">
-                <img src="https://ui-avatars.com/api/?name=Ketua+Kelompok&background=003366&color=fff&size=200" alt="Ketua Kelompok" className="w-full h-full object-cover" />
+            {(!members || members.length === 0) ? (
+              <div className="col-span-full py-12 text-center text-slate-500 bg-slate-50 rounded-2xl border border-slate-100">
+                <p>Belum ada data anggota yang ditambahkan melalui Dashboard.</p>
               </div>
-              <h3 className="text-lg font-bold text-slate-900">Ahmad Budi</h3>
-              <p className="text-unair-blue font-medium text-sm mb-1">Ketua Kelompok</p>
-              <p className="text-slate-500 text-xs">Fakultas Hukum</p>
-            </div>
-
-            {/* Sekretaris */}
-            <div className="group text-center">
-              <div className="w-32 h-32 sm:w-40 sm:h-40 mx-auto rounded-full bg-slate-100 mb-4 overflow-hidden shadow-lg group-hover:shadow-unair-gold/20 transition-all group-hover:-translate-y-2">
-                <img src="https://ui-avatars.com/api/?name=Sekretaris&background=F2A900&color=fff&size=200" alt="Sekretaris" className="w-full h-full object-cover" />
-              </div>
-              <h3 className="text-lg font-bold text-slate-900">Siti Aminah</h3>
-              <p className="text-unair-gold font-medium text-sm mb-1">Sekretaris</p>
-              <p className="text-slate-500 text-xs">Fakultas Ekonomi & Bisnis</p>
-            </div>
-
-            {/* Bendahara */}
-            <div className="group text-center">
-              <div className="w-32 h-32 sm:w-40 sm:h-40 mx-auto rounded-full bg-slate-100 mb-4 overflow-hidden shadow-lg group-hover:shadow-emerald-500/20 transition-all group-hover:-translate-y-2">
-                <img src="https://ui-avatars.com/api/?name=Bendahara&background=10b981&color=fff&size=200" alt="Bendahara" className="w-full h-full object-cover" />
-              </div>
-              <h3 className="text-lg font-bold text-slate-900">Rina Melati</h3>
-              <p className="text-emerald-600 font-medium text-sm mb-1">Bendahara</p>
-              <p className="text-slate-500 text-xs">Fakultas Vokasi</p>
-            </div>
-
-            {/* Divisi Acara */}
-            <div className="group text-center">
-              <div className="w-32 h-32 sm:w-40 sm:h-40 mx-auto rounded-full bg-slate-100 mb-4 overflow-hidden shadow-lg group-hover:shadow-purple-500/20 transition-all group-hover:-translate-y-2">
-                <img src="https://ui-avatars.com/api/?name=Divisi+Acara&background=8b5cf6&color=fff&size=200" alt="Divisi Acara" className="w-full h-full object-cover" />
-              </div>
-              <h3 className="text-lg font-bold text-slate-900">Dimas Aditya</h3>
-              <p className="text-purple-600 font-medium text-sm mb-1">Koordinator Acara</p>
-              <p className="text-slate-500 text-xs">Fakultas Ilmu Budaya</p>
-            </div>
-          </div>
-          
-          <div className="mt-12 text-center">
-            <Link 
-              to="/login"
-              className="inline-flex items-center gap-2 text-unair-blue font-semibold hover:text-blue-900 transition-colors"
-            >
-              Lihat seluruh 12 anggota
-              <ArrowRight className="w-4 h-4" />
-            </Link>
+            ) : (
+              members.map((member) => (
+                <div key={member.id} className="group text-center">
+                  <div className="w-32 h-32 sm:w-40 sm:h-40 mx-auto rounded-full bg-slate-100 mb-4 overflow-hidden shadow-lg group-hover:shadow-unair-blue/20 transition-all group-hover:-translate-y-2 flex items-center justify-center">
+                    {member.foto ? (
+                      <img src={member.foto} alt={member.nama} className="w-full h-full object-cover" />
+                    ) : (
+                      <UserIcon className="w-12 h-12 text-slate-300" />
+                    )}
+                  </div>
+                  <h3 className="text-lg font-bold text-slate-900">{member.nama}</h3>
+                  <p className="text-unair-blue font-medium text-sm mb-1">{member.jabatan || 'Anggota'}</p>
+                  <p className="text-slate-500 text-xs">{member.fakultas || '-'}</p>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </section>

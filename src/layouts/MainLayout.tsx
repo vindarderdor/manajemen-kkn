@@ -16,6 +16,8 @@ import {
   User as UserIcon
 } from 'lucide-react'
 
+import { Home } from 'lucide-react'
+
 export default function MainLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const { profile, signOut } = useAuthStore()
@@ -60,6 +62,13 @@ export default function MainLayout() {
         </div>
 
         <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
+          <NavLink
+            to="/"
+            className="flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors mb-4 border border-slate-200"
+          >
+            <Home className="w-5 h-5 text-unair-gold" />
+            Beranda Web
+          </NavLink>
           {navigation.map((item) => (
             <NavLink
               key={item.name}

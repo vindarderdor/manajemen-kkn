@@ -1,12 +1,15 @@
-import { useState } from 'react'
-import { useWorkPrograms, useCreateWorkProgram } from '../../services/api'
-import { Search, Plus, Loader2, Calendar, Target } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { useWorkPrograms, useCreateWorkProgram, useUpdateWorkProgram, useDeleteWorkProgram } from '../../services/api'
+import { Search, Plus, Loader2, Calendar, Target, Edit2, Trash2 } from 'lucide-react'
 import { format } from 'date-fns'
-import { id } from 'date-fns/locale'
+import { id as localeId } from 'date-fns/locale'
 import Modal from '../../components/Modal'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
+import type { Database } from '../../types/supabase'
+
+type WorkProgramRow = Database['public']['Tables']['work_programs']['Row']
 
 const prokerSchema = z.object({
   nama: z.string().min(3, "Nama program minimal 3 karakter"),
@@ -14,35 +17,79 @@ const prokerSchema = z.object({
   deskripsi: z.string().optional(),
   target: z.string().optional(),
   status: z.enum(['Perencanaan', 'Berjalan', 'Selesai', 'Ditunda']),
+  progress: z.number().min(0).max(100),
 })
 type ProkerForm = z.infer<typeof prokerSchema>
 
 export default function WorkPrograms() {
   const { data: programs, isLoading, error } = useWorkPrograms()
   const createMutation = useCreateWorkProgram()
+  const updateMutation = useUpdateWorkProgram()
+  const deleteMutation = useDeleteWorkProgram()
   
   const [searchTerm, setSearchTerm] = useState('')
+  const [filterKategori, setFilterKategori] = useState('')
+  
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<ProkerForm>({
+  const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm<ProkerForm>({
     resolver: zodResolver(prokerSchema),
     defaultValues: {
-      status: 'Perencanaan'
+      status: 'Perencanaan',
+      progress: 0
     }
   })
 
-  const onSubmit = (data: ProkerForm) => {
-    createMutation.mutate(data, {
-      onSuccess: () => {
-        setIsModalOpen(false)
-        reset()
-      }
-    })
+  // Open modal for edit
+  const handleEdit = (prog: WorkProgramRow) => {
+    setEditingId(prog.id)
+    setValue('nama', prog.nama)
+    setValue('kategori', prog.kategori || '')
+    setValue('deskripsi', prog.deskripsi || '')
+    setValue('target', prog.target || '')
+    setValue('status', prog.status as any)
+    setValue('progress', prog.progress || 0)
+    setIsModalOpen(true)
   }
 
-  const filteredPrograms = programs?.filter(prog => 
-    prog.nama.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  // Handle Create or Update
+  const onSubmit = (data: ProkerForm) => {
+    if (editingId) {
+      updateMutation.mutate({ id: editingId, ...data }, {
+        onSuccess: () => {
+          setIsModalOpen(false)
+          reset()
+          setEditingId(null)
+        }
+      })
+    } else {
+      createMutation.mutate(data, {
+        onSuccess: () => {
+          setIsModalOpen(false)
+          reset()
+        }
+      })
+    }
+  }
+
+  const handleDelete = (id: string) => {
+    if (window.confirm('Yakin ingin menghapus program kerja ini?')) {
+      deleteMutation.mutate(id)
+    }
+  }
+
+  const openCreateModal = () => {
+    setEditingId(null)
+    reset({ status: 'Perencanaan', progress: 0, nama: '', kategori: '', deskripsi: '', target: '' })
+    setIsModalOpen(true)
+  }
+
+  const filteredPrograms = programs?.filter(prog => {
+    const matchesSearch = prog.nama.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesKategori = filterKategori ? prog.kategori === filterKategori : true
+    return matchesSearch && matchesKategori
+  })
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -77,7 +124,7 @@ export default function WorkPrograms() {
           <p className="text-slate-500">Kelola proker dan pantau progres pelaksanaannya.</p>
         </div>
         <button 
-          onClick={() => setIsModalOpen(true)}
+          onClick={openCreateModal}
           className="flex items-center gap-2 bg-unair-blue hover:bg-blue-900 text-white px-4 py-2 rounded-lg font-medium transition-colors"
         >
           <Plus className="w-4 h-4" />
@@ -97,7 +144,11 @@ export default function WorkPrograms() {
           />
         </div>
         
-        <select className="border border-slate-300 rounded-lg px-4 py-2 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-unair-blue/20 focus:border-unair-blue">
+        <select 
+          value={filterKategori}
+          onChange={(e) => setFilterKategori(e.target.value)}
+          className="border border-slate-300 rounded-lg px-4 py-2 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-unair-blue/20 focus:border-unair-blue"
+        >
           <option value="">Semua Kategori</option>
           <option value="Kesehatan">Kesehatan</option>
           <option value="Pendidikan">Pendidikan</option>
@@ -113,14 +164,20 @@ export default function WorkPrograms() {
           </div>
         ) : (
           filteredPrograms?.map((prog) => (
-            <div key={prog.id} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col hover:shadow-md transition-shadow">
+            <div key={prog.id} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col hover:shadow-md transition-shadow group">
               <div className="flex justify-between items-start mb-4">
                 <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${getStatusColor(prog.status)}`}>
                   {prog.status}
                 </span>
-                <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2.5 py-1 rounded-md">
-                  {prog.kategori || 'Umum'}
-                </span>
+                
+                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button onClick={() => handleEdit(prog)} className="text-slate-400 hover:text-unair-blue" title="Edit">
+                    <Edit2 className="w-4 h-4" />
+                  </button>
+                  <button onClick={() => handleDelete(prog.id)} className="text-slate-400 hover:text-red-500" title="Hapus">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
               
               <h3 className="text-lg font-bold text-slate-900 mb-2 line-clamp-2" title={prog.nama}>
@@ -135,9 +192,9 @@ export default function WorkPrograms() {
                 <div className="flex items-center gap-2 text-sm text-slate-600">
                   <Calendar className="w-4 h-4 text-slate-400" />
                   <span>
-                    {prog.tanggal_mulai ? format(new Date(prog.tanggal_mulai), 'd MMM yyyy', { locale: id }) : '-'} 
+                    {prog.tanggal_mulai ? format(new Date(prog.tanggal_mulai), 'd MMM yyyy', { locale: localeId }) : '-'} 
                     {' '}s/d{' '} 
-                    {prog.tanggal_selesai ? format(new Date(prog.tanggal_selesai), 'd MMM yyyy', { locale: id }) : '-'}
+                    {prog.tanggal_selesai ? format(new Date(prog.tanggal_selesai), 'd MMM yyyy', { locale: localeId }) : '-'}
                   </span>
                 </div>
                 <div className="flex items-center gap-2 text-sm text-slate-600">
@@ -160,10 +217,16 @@ export default function WorkPrograms() {
                 
                 <div className="mt-4 flex justify-between items-center">
                   <span className="text-xs text-slate-500">
-                    PJ: <span className="font-medium text-slate-700">{(prog as any).penanggung_jawab?.nama || '-'}</span>
+                    Kategori: <span className="font-medium text-slate-700">{prog.kategori || 'Umum'}</span>
                   </span>
-                  <button className="text-sm font-medium text-unair-blue hover:text-blue-900">
-                    Detail
+                </div>
+                {/* Mobile action buttons */}
+                <div className="mt-4 flex justify-end gap-3 sm:hidden border-t border-slate-100 pt-3">
+                  <button onClick={() => handleEdit(prog)} className="text-sm font-medium text-unair-blue flex items-center gap-1">
+                    <Edit2 className="w-3 h-3" /> Edit
+                  </button>
+                  <button onClick={() => handleDelete(prog.id)} className="text-sm font-medium text-red-500 flex items-center gap-1">
+                    <Trash2 className="w-3 h-3" /> Hapus
                   </button>
                 </div>
               </div>
@@ -175,7 +238,7 @@ export default function WorkPrograms() {
       <Modal 
         isOpen={isModalOpen} 
         onClose={() => setIsModalOpen(false)}
-        title="Tambah Program Kerja"
+        title={editingId ? "Edit Program Kerja" : "Tambah Program Kerja"}
       >
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div>
@@ -220,9 +283,21 @@ export default function WorkPrograms() {
               placeholder="Jelaskan tujuan dan gambaran kegiatan..."
             />
           </div>
+          
+          {editingId && (
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Progres (%)</label>
+              <input 
+                type="number"
+                {...register('progress', { valueAsNumber: true })}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-unair-blue/20 focus:border-unair-blue outline-none" 
+                min="0" max="100"
+              />
+            </div>
+          )}
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Status Awal</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Status</label>
             <select 
               {...register('status')}
               className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-unair-blue/20 focus:border-unair-blue outline-none"
@@ -244,11 +319,11 @@ export default function WorkPrograms() {
             </button>
             <button 
               type="submit" 
-              disabled={createMutation.isPending}
+              disabled={createMutation.isPending || updateMutation.isPending}
               className="px-4 py-2 bg-unair-blue hover:bg-blue-900 text-white font-medium rounded-lg transition-colors flex items-center gap-2"
             >
-              {createMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
-              Simpan Proker
+              {(createMutation.isPending || updateMutation.isPending) && <Loader2 className="w-4 h-4 animate-spin" />}
+              {editingId ? "Simpan Perubahan" : "Simpan Proker"}
             </button>
           </div>
         </form>
